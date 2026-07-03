@@ -305,7 +305,13 @@ using socklen_t = int;
 #include <new>
 #endif
 #include <sys/socket.h>
+// nx-remote-ovl patch: no Unix domain socket support (sys/un.h / sockaddr_un)
+// on devkitA64/libnx. The one place that needs the sockaddr_un type (in
+// create_socket() below) is excluded from compilation the same way it's
+// already excluded on Windows.
+#if !defined(__SWITCH__)
 #include <sys/un.h>
+#endif
 #include <unistd.h>
 
 using socket_t = int;
@@ -6258,7 +6264,7 @@ socket_t create_socket(const std::string &host, const std::string &ip, int port,
     hints.ai_flags = socket_flags;
   }
 
-#if !defined(_WIN32) || defined(CPPHTTPLIB_HAVE_AFUNIX_H)
+#if (!defined(_WIN32) || defined(CPPHTTPLIB_HAVE_AFUNIX_H)) && !defined(__SWITCH__)
   if (hints.ai_family == AF_UNIX) {
     const auto addrlen = host.length();
     if (addrlen > sizeof(sockaddr_un::sun_path)) { return INVALID_SOCKET; }
