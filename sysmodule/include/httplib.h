@@ -314,6 +314,19 @@ using socklen_t = int;
 #endif
 #include <unistd.h>
 
+// nx-remote-ovl patch: libnx's sys/socket.h defines the SOCK_CLOEXEC flag
+// constant for API completeness, but its bsd:u-backed socket()/accept() never
+// implemented the behavior (no accept4() at all, and passing the flag into
+// socket()'s type argument is rejected by the bsd service). Undefining it
+// here makes every `#ifdef SOCK_CLOEXEC` / `#elif defined SOCK_CLOEXEC` below
+// fall through to the plain socket()/accept() + fcntl(FD_CLOEXEC) paths the
+// library already uses on platforms that never had SOCK_CLOEXEC to begin
+// with. FD_CLOEXEC itself is moot for us anyway - Horizon user processes
+// don't fork/exec - so losing it changes nothing behaviorally.
+#if defined(__SWITCH__) && defined(SOCK_CLOEXEC)
+#undef SOCK_CLOEXEC
+#endif
+
 using socket_t = int;
 #ifndef INVALID_SOCKET
 #define INVALID_SOCKET (-1)
@@ -4568,6 +4581,29 @@ inline std::string compute_etag(const FileStat &fs) {
          from_i_to_hex(size) + "\"";
 }
 
+#if defined(__SWITCH__)
+// nx-remote-ovl patch: devkitA64/libnx has no timegm(). This is a portable
+// UTC-only implementation (Howard Hinnant's days_from_civil algorithm) so we
+// don't depend on mktime()'s local-timezone semantics, which aren't reliably
+// configured in a sysmodule that never calls the time service's calendar
+// APIs.
+inline time_t portable_timegm(struct tm *tm) {
+  int year = tm->tm_year + 1900;
+  int month = tm->tm_mon + 1; // 1-12
+
+  int64_t y = year - (month <= 2 ? 1 : 0);
+  int64_t era = (y >= 0 ? y : y - 399) / 400;
+  int64_t yoe = y - era * 400;                                    // [0, 399]
+  int64_t doy =
+      (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + tm->tm_mday - 1;
+  int64_t doe = yoe * 365 + yoe / 4 - yoe / 100 + doy; // [0, 146096]
+  int64_t days_since_epoch = era * 146097 + doe - 719468;
+
+  return static_cast<time_t>(days_since_epoch * 86400 + tm->tm_hour * 3600 +
+                             tm->tm_min * 60 + tm->tm_sec);
+}
+#endif
+
 // Format time_t as HTTP-date (RFC 9110 Section 5.6.7): "Sun, 06 Nov 1994
 // 08:49:37 GMT" This implementation is defensive: it validates `mtime`, checks
 // return values from `gmtime_r`/`gmtime_s`, and ensures `strftime` succeeds.
@@ -4621,6 +4657,8 @@ inline time_t parse_http_date(const std::string &date_str) {
   return _mkgmtime(&tm_buf);
 #elif defined _AIX
   return mktime(&tm_buf);
+#elif defined __SWITCH__
+  return portable_timegm(&tm_buf);
 #else
   return timegm(&tm_buf);
 #endif
