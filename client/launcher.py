@@ -16,7 +16,7 @@ DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "
 
 
 def load_config(path):
-    defaults = {"switch_ip": "192.168.1.50", "port": "8080", "password": "changeme"}
+    defaults = {"switch_ip": "192.168.1.50", "port": "61337", "password": "changeme"}
 
     parser = configparser.ConfigParser()
     parser["nx-remote-ovl"] = defaults

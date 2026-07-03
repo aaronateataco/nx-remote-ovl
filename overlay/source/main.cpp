@@ -8,10 +8,9 @@
 #include <fstream>
 #include <sys/stat.h>
 
-// Raw 48x48 RGBA8888 avatars embedded from overlay/data/*.bin - see
+// Raw 48x48 RGBA8888 avatar embedded from overlay/data/*.bin - see
 // overlay/Makefile's generic bin2o rule. Headers are generated into build/.
 #include "aaronateataco_bin.h"
-#include "yeetov_bin.h"
 
 namespace {
 
@@ -39,7 +38,7 @@ std::string Trim(const std::string &s) {
 // The sysmodule owns the config schema; the overlay only ever rewrites the
 // password line so it never clobbers port/rate_limit_seconds set elsewhere.
 void SetPassword(const std::string &password) {
-    int port = 8080;
+    int port = 61337;
     int rateLimit = 3;
 
     std::ifstream in(ConfigPath);
@@ -138,9 +137,6 @@ public:
         list->addItem(new tsl::elm::CategoryHeader("Credits", true));
         list->addItem(new tsl::elm::CustomDrawer([](tsl::gfx::Renderer *renderer, s32 x, s32 y, s32 w, s32 h) {
             DrawCredit(renderer, x, y, aaronateataco_bin, "Aaronateataco", "nx-remote-ovl");
-        }), AvatarSize + 12);
-        list->addItem(new tsl::elm::CustomDrawer([](tsl::gfx::Renderer *renderer, s32 x, s32 y, s32 w, s32 h) {
-            DrawCredit(renderer, x, y, yeetov_bin, "Yeetov", "NXRLPlayniteSupport");
         }), AvatarSize + 12);
 
         frame->setContent(list);

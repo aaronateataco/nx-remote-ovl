@@ -18,7 +18,7 @@ constexpr const char *ConfigPath = "sdmc:/config/nx-remote-ovl/config.ini";
 
 struct Config {
     std::string password = "changeme";
-    int port = 8080;
+    int port = 61337;
     int rate_limit_seconds = 3;
 };
 
@@ -39,7 +39,7 @@ void WriteDefaultConfig() {
     out << "# Change the password from the Ultrahand overlay in-game, or edit this\n";
     out << "# file directly. Changes are picked up on the next request, no reboot needed.\n";
     out << "password = changeme\n";
-    out << "port = 8080\n";
+    out << "port = 61337\n";
     out << "rate_limit_seconds = 3\n";
 }
 
@@ -114,6 +114,99 @@ bool LaunchTitle(u64 titleId) {
     u64 pid = 0;
     return R_SUCCEEDED(pmshellLaunchProgram(0, &location, &pid));
 }
+
+// Served at GET /. Self-hosted, so /api/launch below is same-origin - no
+// CORS headers needed. Everything is inlined (no external requests).
+constexpr const char *IndexHtml = R"HTML(<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nx-remote-ovl</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: #14151a; color: #e8e8ec;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  main { width: 100%; max-width: 420px; padding: 32px 28px; box-sizing: border-box; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  p.sub { margin: 0 0 24px; color: #9a9aa5; font-size: 0.9rem; }
+  label { display: block; font-size: 0.85rem; color: #b4b4bd; margin: 16px 0 6px; }
+  input {
+    width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 8px;
+    border: 1px solid #33333d; background: #1d1e25; color: #e8e8ec; font-size: 1rem;
+  }
+  input:focus { outline: none; border-color: #6c8cff; }
+  button {
+    width: 100%; margin-top: 22px; padding: 12px; border: none; border-radius: 8px;
+    background: #6c8cff; color: #0b0b10; font-size: 1rem; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: 0.6; cursor: default; }
+  #status { margin-top: 16px; font-size: 0.9rem; min-height: 1.2em; }
+  #status.ok { color: #6cffa0; }
+  #status.err { color: #ff6c6c; }
+</style>
+</head>
+<body>
+<main>
+  <h1>nx-remote-ovl</h1>
+  <p class="sub">Launch a game on this Switch.</p>
+
+  <label for="titleId">Title ID (hex)</label>
+  <input id="titleId" placeholder="0100000000010000" autocomplete="off" spellcheck="false">
+
+  <label for="password">Password</label>
+  <input id="password" type="password" autocomplete="off">
+
+  <button id="launchBtn">Launch</button>
+  <div id="status"></div>
+</main>
+<script>
+  const titleIdEl = document.getElementById('titleId');
+  const passwordEl = document.getElementById('password');
+  const statusEl = document.getElementById('status');
+  const launchBtn = document.getElementById('launchBtn');
+
+  passwordEl.value = localStorage.getItem('nx-remote-ovl-password') || '';
+
+  launchBtn.addEventListener('click', async () => {
+    const titleId = titleIdEl.value.trim();
+    const password = passwordEl.value;
+
+    if (!titleId) {
+      statusEl.textContent = 'Enter a Title ID first.';
+      statusEl.className = 'err';
+      return;
+    }
+
+    localStorage.setItem('nx-remote-ovl-password', password);
+
+    launchBtn.disabled = true;
+    statusEl.textContent = 'Launching...';
+    statusEl.className = '';
+
+    try {
+      const res = await fetch('/api/launch', {
+        method: 'POST',
+        headers: { 'Authorization': password, 'Content-Type': 'text/plain' },
+        body: titleId,
+      });
+      const text = await res.text();
+      statusEl.textContent = text;
+      statusEl.className = res.ok ? 'ok' : 'err';
+    } catch (e) {
+      statusEl.textContent = 'Could not reach the Switch: ' + e;
+      statusEl.className = 'err';
+    } finally {
+      launchBtn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
+)HTML";
 
 } // namespace
 
@@ -204,6 +297,12 @@ int main(int, char **) {
     // the sysmodule is up before prompting for a title.
     svr.Get("/api/ping", [](const httplib::Request &, httplib::Response &res) {
         res.set_content("nx-remote-ovl-sys ok", "text/plain");
+    });
+
+    // Self-hosted web launcher: open http://<switch-ip>:<port>/ in any
+    // browser on the LAN, no separate client needed.
+    svr.Get("/", [](const httplib::Request &, httplib::Response &res) {
+        res.set_content(IndexHtml, "text/html");
     });
 
     svr.Post("/api/launch", [&](const httplib::Request &req, httplib::Response &res) {

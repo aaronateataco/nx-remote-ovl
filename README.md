@@ -15,6 +15,7 @@ By utilizing a lightweight background sysmodule combined with a sleek **Tesla/Ul
 * **⏱️ Rate Limiting:** Built-in protection limits requests to **1 game every 3 seconds** (configurable) to prevent spamming, accidental double-clicks, or system crashes.
 * **🖥️ Tesla/Ultrahand Overlay GUI:** Pull up the overlay in-game to check your Switch's IP address, daemon status, and set your password with the on-screen keyboard.
 * **🌍 Universal & Frontend Agnostic:** A plain REST API (`POST /api/launch`). Whether you are running a Bash script on Linux or using a slick UI on Windows, integration is flawless.
+* **📱 Self-Hosted Web Launcher:** The sysmodule serves its own tiny web page at `http://<switch-ip>:61337/` - open it from any phone/PC browser on your LAN and launch a title with no separate app installed.
 
 ---
 
