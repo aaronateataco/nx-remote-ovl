@@ -296,7 +296,14 @@ using socklen_t = int;
 #include <netinet/tcp.h>
 #include <poll.h>
 #include <pthread.h>
+// nx-remote-ovl patch: devkitA64/libnx has no sys/mman.h / mmap(). detail::mmap
+// below has a matching __SWITCH__ branch that reads the file into a heap
+// buffer instead of memory-mapping it.
+#if !defined(__SWITCH__)
 #include <sys/mman.h>
+#else
+#include <new>
+#endif
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -5526,6 +5533,45 @@ inline bool mmap::open(const char *path) {
     close();
     return false;
   }
+#elif defined(__SWITCH__)
+  // No mmap() on libnx: read the whole file into a heap buffer instead.
+  fd_ = ::open(path, O_RDONLY);
+  if (fd_ == -1) { return false; }
+
+  struct stat sb;
+  if (fstat(fd_, &sb) == -1) {
+    close();
+    return false;
+  }
+  size_ = static_cast<size_t>(sb.st_size);
+
+  // Special treatment for an empty file...
+  if (size_ == 0) {
+    close();
+    is_open_empty_file = true;
+    return true;
+  }
+
+  addr_ = ::operator new(size_, std::nothrow);
+  if (addr_ == nullptr) {
+    close();
+    return false;
+  }
+
+  size_t total_read = 0;
+  while (total_read < size_) {
+    auto n = ::read(fd_, static_cast<char *>(addr_) + total_read,
+                     size_ - total_read);
+    if (n <= 0) break;
+    total_read += static_cast<size_t>(n);
+  }
+
+  if (total_read != size_) {
+    ::operator delete(addr_);
+    addr_ = nullptr;
+    close();
+    return false;
+  }
 #else
   fd_ = ::open(path, O_RDONLY);
   if (fd_ == -1) { return false; }
@@ -5578,6 +5624,16 @@ inline void mmap::close() {
   }
 
   is_open_empty_file = false;
+#elif defined(__SWITCH__)
+  if (addr_ != nullptr) {
+    ::operator delete(addr_);
+    addr_ = nullptr;
+  }
+
+  if (fd_ != -1) {
+    ::close(fd_);
+    fd_ = -1;
+  }
 #else
   if (addr_ != nullptr) {
     munmap(addr_, size_);
