@@ -139,6 +139,18 @@ public:
             DrawCredit(renderer, x, y, aaronateataco_bin, "Aaronateataco", "nx-remote-ovl");
         }), AvatarSize + 12);
 
+        auto *inspirationItem = new tsl::elm::ListItem("kirankunigiri/nx-remote-launcher");
+        inspirationItem->setValue("Original inspiration");
+        list->addItem(inspirationItem);
+
+        auto *teslaItem = new tsl::elm::ListItem("WerWolv/libtesla & Ultrahand Team");
+        teslaItem->setValue("Overlay framework");
+        list->addItem(teslaItem);
+
+        auto *httplibItem = new tsl::elm::ListItem("yhirose/cpp-httplib");
+        httplibItem->setValue("HTTP server");
+        list->addItem(httplibItem);
+
         frame->setContent(list);
         return frame;
     }
