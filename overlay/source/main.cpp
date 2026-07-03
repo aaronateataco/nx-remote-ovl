@@ -8,9 +8,12 @@
 #include <fstream>
 #include <sys/stat.h>
 
-// Raw 48x48 RGBA8888 avatar embedded from overlay/data/*.bin - see
+// Raw 48x48 RGBA8888 avatars embedded from overlay/data/*.bin - see
 // overlay/Makefile's generic bin2o rule. Headers are generated into build/.
 #include "aaronateataco_bin.h"
+#include "kirankunigiri_bin.h"
+#include "werwolv_bin.h"
+#include "yhirose_bin.h"
 
 namespace {
 
@@ -138,18 +141,15 @@ public:
         list->addItem(new tsl::elm::CustomDrawer([](tsl::gfx::Renderer *renderer, s32 x, s32 y, s32 w, s32 h) {
             DrawCredit(renderer, x, y, aaronateataco_bin, "Aaronateataco", "nx-remote-ovl");
         }), AvatarSize + 12);
-
-        auto *inspirationItem = new tsl::elm::ListItem("kirankunigiri/nx-remote-launcher");
-        inspirationItem->setValue("Original inspiration");
-        list->addItem(inspirationItem);
-
-        auto *teslaItem = new tsl::elm::ListItem("WerWolv/libtesla & Ultrahand Team");
-        teslaItem->setValue("Overlay framework");
-        list->addItem(teslaItem);
-
-        auto *httplibItem = new tsl::elm::ListItem("yhirose/cpp-httplib");
-        httplibItem->setValue("HTTP server");
-        list->addItem(httplibItem);
+        list->addItem(new tsl::elm::CustomDrawer([](tsl::gfx::Renderer *renderer, s32 x, s32 y, s32 w, s32 h) {
+            DrawCredit(renderer, x, y, kirankunigiri_bin, "kirankunigiri/nx-remote-launcher", "Original inspiration");
+        }), AvatarSize + 12);
+        list->addItem(new tsl::elm::CustomDrawer([](tsl::gfx::Renderer *renderer, s32 x, s32 y, s32 w, s32 h) {
+            DrawCredit(renderer, x, y, werwolv_bin, "WerWolv/libtesla & Ultrahand Team", "Overlay framework");
+        }), AvatarSize + 12);
+        list->addItem(new tsl::elm::CustomDrawer([](tsl::gfx::Renderer *renderer, s32 x, s32 y, s32 w, s32 h) {
+            DrawCredit(renderer, x, y, yhirose_bin, "yhirose/cpp-httplib", "HTTP server");
+        }), AvatarSize + 12);
 
         frame->setContent(list);
         return frame;
