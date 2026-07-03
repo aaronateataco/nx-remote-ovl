@@ -270,7 +270,9 @@ using socklen_t = int;
 #else // not _WIN32
 
 #include <arpa/inet.h>
-#if !defined(_AIX) && !defined(__MVS__)
+// nx-remote-ovl patch: devkitA64/libnx has no ifaddrs.h. Excluded the same
+// way this header already excludes it on _AIX/__MVS__/Windows below.
+#if !defined(_AIX) && !defined(__MVS__) && !defined(__SWITCH__)
 #include <ifaddrs.h>
 #endif
 #ifdef __MVS__
@@ -279,7 +281,11 @@ using socklen_t = int;
 #define NI_MAXHOST 1025
 #endif
 #endif
+// nx-remote-ovl patch: unused by this header (no if_nametoindex/IFNAMSIZ
+// references below) and not present on devkitA64/libnx.
+#if !defined(__SWITCH__)
 #include <net/if.h>
+#endif
 #include <netdb.h>
 #include <netinet/in.h>
 #ifdef __linux__
@@ -6362,7 +6368,8 @@ inline bool bind_ip_address(socket_t sock, const std::string &host) {
   return ret;
 }
 
-#if !defined _WIN32 && !defined ANDROID && !defined _AIX && !defined __MVS__
+#if !defined _WIN32 && !defined ANDROID && !defined _AIX && !defined __MVS__ && \
+    !defined __SWITCH__
 #define USE_IF2IP
 #endif
 
