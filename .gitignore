@@ -1,0 +1,22 @@
+# Build artifacts
+sysmodule/build/
+sysmodule/*.nsp
+sysmodule/*.nso
+sysmodule/*.npdm
+sysmodule/*.elf
+sysmodule/*.map
+
+overlay/build/
+overlay/*.ovl
+overlay/*.nro
+overlay/*.nacp
+overlay/*.elf
+overlay/*.map
+
+# Local secrets
+client/config.ini
+
+# Editor/OS cruft
+.vscode/
+*.swp
+.DS_Store
