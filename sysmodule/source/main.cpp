@@ -255,22 +255,12 @@ void __appInit(void) {
     if (R_FAILED(rc))
         diagAbortWithResult(rc);
 
-    rc = nifmInitialize(NifmServiceType_System);
-    if (R_FAILED(rc))
-        diagAbortWithResult(rc);
-
-    static const SocketInitConfig socketCfg = {
-        .tcp_tx_buf_size = 0x2000,
-        .tcp_rx_buf_size = 0x2000,
-        .tcp_tx_buf_max_size = 0x4000,
-        .tcp_rx_buf_max_size = 0x4000,
-        .udp_tx_buf_size = 0,
-        .udp_rx_buf_size = 0,
-        .sb_efficiency = 4,
-        .num_bsd_sessions = 2,
-        .bsd_service_type = BsdServiceType_User,
-    };
-    rc = socketInitialize(&socketCfg);
+    // Deliberately not calling nifmInitialize() here: this file never calls a
+    // single nifm function (IP display lives in the overlay, not here), and
+    // an unused service init is pure risk - if it ever fails for any reason,
+    // diagAbortWithResult() below takes down the entire sysmodule for zero
+    // functional benefit. Only bring up services we actually use.
+    rc = socketInitializeDefault();
     if (R_FAILED(rc))
         diagAbortWithResult(rc);
 
@@ -279,7 +269,6 @@ void __appInit(void) {
 
 void __appExit(void) {
     socketExit();
-    nifmExit();
     pmshellExit();
     pmdmntExit();
     fsdevUnmountAll();

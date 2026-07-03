@@ -71,6 +71,11 @@ void SetPassword(const std::string &password) {
     out << "rate_limit_seconds = " << rateLimit << "\n";
 }
 
+bool IsWifiConnected() {
+    u32 ip = 0;
+    return R_SUCCEEDED(nifmGetCurrentIpAddress(&ip));
+}
+
 std::string GetSwitchIp() {
     u32 ip = 0;
     if (R_FAILED(nifmGetCurrentIpAddress(&ip)))
@@ -87,31 +92,58 @@ bool IsDaemonRunning() {
     return R_SUCCEEDED(pmdmntGetProcessId(&pid, SysmoduleTitleId)) && pid > 0;
 }
 
-bool PromptForPassword() {
-    SwkbdConfig kbd;
-    if (R_FAILED(swkbdCreate(&kbd, 0)))
-        return false;
+// The on-screen keyboard (swkbd) doesn't reliably launch from inside an
+// active Tesla/Ultrahand overlay context - even Ultrahand's own UI avoids it
+// entirely for text entry. So instead of typing a password, generate one with
+// the console's hardware RNG and show it right on the list item: the user
+// reads it off screen once and copies it into their client's config.
+std::string RandomizePassword() {
+    static const char charset[] = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+    constexpr size_t length = 10;
 
-    swkbdConfigMakePresetDefault(&kbd);
-    swkbdConfigSetGuideText(&kbd, "Set the nx-remote-ovl password");
+    u8 raw[length];
+    csrngGetRandomBytes(raw, sizeof(raw));
 
-    char outBuf[65] = {0};
-    bool ok = R_SUCCEEDED(swkbdShow(&kbd, outBuf, sizeof(outBuf))) && std::strlen(outBuf) > 0;
-    if (ok)
-        SetPassword(outBuf);
+    std::string password;
+    password.reserve(length);
+    for (size_t i = 0; i < length; i++)
+        password += charset[raw[i] % (sizeof(charset) - 1)];
 
-    swkbdClose(&kbd);
-    return ok;
+    SetPassword(password);
+    return password;
 }
 
 } // namespace
+
+// Draws the normal frame, then - if there's no Wi-Fi connection - dims the
+// whole screen with a translucent grey layer and a status message on top of
+// everything else, since nothing here works remotely without a network.
+class NxOverlayFrame : public tsl::elm::OverlayFrame {
+public:
+    NxOverlayFrame(const std::string &title, const std::string &subtitle)
+        : tsl::elm::OverlayFrame(title, subtitle) {}
+
+    virtual void draw(tsl::gfx::Renderer *renderer) override {
+        tsl::elm::OverlayFrame::draw(renderer);
+
+        if (IsWifiConnected())
+            return;
+
+        renderer->drawRect(0, 0, tsl::cfg::FramebufferWidth, tsl::cfg::FramebufferHeight,
+                            renderer->a(tsl::Color(0x8, 0x8, 0x8, 0xA)));
+        renderer->drawString("Not connected to Wi-Fi", false, 55, 400, 25,
+                              renderer->a(tsl::style::color::ColorText));
+        renderer->drawString("Remote launching won't work until this Switch is online.", false, 55, 425, 15,
+                              renderer->a(tsl::style::color::ColorDescription));
+    }
+};
 
 class MainGui : public tsl::Gui {
 public:
     MainGui() = default;
 
     virtual tsl::elm::Element *createUI() override {
-        auto *frame = new tsl::elm::OverlayFrame("nx-remote-ovl", VERSION);
+        auto *frame = new NxOverlayFrame("nx-remote-ovl", VERSION);
 
         auto *list = new tsl::elm::List();
 
@@ -127,10 +159,10 @@ public:
 
         list->addItem(new tsl::elm::CategoryHeader("Security", true));
 
-        auto *passwordItem = new tsl::elm::ListItem("Change Password", "");
-        passwordItem->setClickListener([](u64 keys) -> bool {
+        auto *passwordItem = new tsl::elm::ListItem("Randomize Password", "Press A");
+        passwordItem->setClickListener([passwordItem](u64 keys) -> bool {
             if (keys & HidNpadButton_A) {
-                PromptForPassword();
+                passwordItem->setValue(RandomizePassword());
                 return true;
             }
             return false;
@@ -173,12 +205,15 @@ private:
 class NxRemoteOverlay : public tsl::Overlay {
 public:
     // libtesla already initializes fs, hid, pl, pmdmnt, hid:sys and set:sys
-    // for every overlay, so we only need to bring up nifm ourselves.
+    // for every overlay, so we only need to bring up nifm (IP display) and
+    // csrng (random password generation) ourselves.
     virtual void initServices() override {
         nifmInitialize(NifmServiceType_User);
+        csrngInitialize();
     }
 
     virtual void exitServices() override {
+        csrngExit();
         nifmExit();
     }
 
