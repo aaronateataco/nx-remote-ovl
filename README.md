@@ -30,8 +30,8 @@ The project is split into two main components:
 
 Want to click "Play" on your PC and have your Switch instantly boot the game? I've built a dedicated Playnite integration for exactly this purpose!
 
-Check out my sister repository to get it set up:
-👉 **[Yeetov/NXRLPlayniteSupport](https://github.com/Yeetov/NXRLPlayniteSupport)**
+Check out this epic repository to get it set up:
+👉 **[NXRLPlayniteSupport](https://github.com/Yeetov/NXRLPlayniteSupport)**
 
 ---
 
